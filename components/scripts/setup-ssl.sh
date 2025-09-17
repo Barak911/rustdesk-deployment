@@ -59,7 +59,7 @@ certbot certonly --standalone \
 
 # Create nginx configuration for RustDesk
 echo -e "${YELLOW}Creating nginx configuration...${NC}"
-cat > /etc/nginx/sites-available/rustdesk << 'EOF'
+cat > "$NGINX_DIR/sites-available/rustdesk" << 'EOF'
 server {
     listen 80;
     server_name danyel-remote.com;
@@ -199,8 +199,8 @@ server {
 EOF
 
 # Enable the site
-ln -sf /etc/nginx/sites-available/rustdesk /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
+ln -sf "$NGINX_DIR/sites-available/rustdesk" "$NGINX_DIR/sites-enabled/"
+rm -f "$NGINX_DIR/sites-enabled/default"
 
 # Test nginx configuration
 echo -e "${YELLOW}Testing nginx configuration...${NC}"
@@ -236,7 +236,7 @@ chmod +x /opt/rustdesk/renew-ssl.sh
 
 # Create monitoring password file (optional)
 echo -e "${YELLOW}Setting up monitoring authentication...${NC}"
-htpasswd -bc /etc/nginx/.htpasswd admin rustdesk123
+htpasswd -bc "$NGINX_DIR/.htpasswd" admin rustdesk123
 
 # Create status page
 echo -e "${YELLOW}Creating status page...${NC}"
