@@ -18,6 +18,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+    permissions:
+      contents: write
+      actions: write
 
     steps:
     - name: Checkout code
@@ -94,6 +97,12 @@ jobs:
       if: github.ref_name == 'main' && success()
       run: |
         TAG_NAME="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
+
+        # Configure git with GitHub Actions bot
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+        # Create and push tag
         git tag ${TAG_NAME}
-        git push origin ${TAG_NAME}
+        git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git ${TAG_NAME}
         echo "🏷️ Created tag: ${TAG_NAME}"
