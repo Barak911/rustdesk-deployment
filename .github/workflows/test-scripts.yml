@@ -44,6 +44,8 @@ jobs:
         export AWS_REGION="il-central-1"
         export RUSTDESK_DOMAIN="danyel-remote.com"
         export SSL_ENABLED="true"
+        export BASE_DIR="/opt/rustdesk"
+        export BACKUP_DIR="/opt/rustdesk/backups"
 
         for file in $SHELL_FILES; do
           echo "Checking: $file"
@@ -56,12 +58,16 @@ jobs:
         echo "🐍 Validating Python scripts..."
         PYTHON_FILES=$(find components/ -name "*.py" -type f)
 
-        for file in $PYTHON_FILES; do
-          echo "Checking: $file"
-          python3 -m py_compile "$file"
-          python3 -m flake8 "$file" --max-line-length=120 --ignore=E501 || true
-        done
-        echo "✅ All Python scripts passed syntax validation"
+        if [ -n "$PYTHON_FILES" ]; then
+          for file in $PYTHON_FILES; do
+            echo "Checking: $file"
+            python3 -m py_compile "$file"
+            python3 -m flake8 "$file" --max-line-length=120 --ignore=E501 || true
+          done
+          echo "✅ All Python scripts passed syntax validation"
+        else
+          echo "ℹ️ No Python scripts found to validate"
+        fi
 
     - name: Validate JSON files
       run: |
