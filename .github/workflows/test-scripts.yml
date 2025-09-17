@@ -34,6 +34,16 @@ jobs:
           exit 1
         fi
 
+        # Set environment variables for shellcheck validation
+        export DATA_DIR="/opt/rustdesk"
+        export WEB_DIR="/opt/rustdesk/web"
+        export MONITORING_PORT="8080"
+        export MONITORING_ENABLED="true"
+        export S3_BUCKET="rustdesk-s3-bak"
+        export AWS_REGION="il-central-1"
+        export RUSTDESK_DOMAIN="danyel-remote.com"
+        export SSL_ENABLED="true"
+
         for file in $SHELL_FILES; do
           echo "Checking: $file"
           shellcheck "$file"
