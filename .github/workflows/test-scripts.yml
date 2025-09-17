@@ -109,15 +109,14 @@ jobs:
       run: |
         echo "☁️ Validating CloudFormation templates..."
         if [ -f "cloudformation/template-docker-enhanced.yaml" ]; then
-          # Check basic YAML structure without loading CloudFormation intrinsic functions
-          python3 -c "
+          # Create a Python script for CloudFormation validation
+          cat > /tmp/validate_cf.py << 'EOF'
 import yaml
 import sys
 
 class CloudFormationLoader(yaml.SafeLoader):
     pass
 
-# Add constructors for CloudFormation intrinsic functions
 def construct_ref(loader, node):
     return {'Ref': loader.construct_scalar(node)}
 
@@ -174,7 +173,8 @@ try:
 except Exception as e:
     print(f'❌ CloudFormation template validation failed: {e}')
     sys.exit(1)
-"
+EOF
+          python3 /tmp/validate_cf.py
         fi
 
     - name: Check file permissions
