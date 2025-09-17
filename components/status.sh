@@ -14,6 +14,6 @@ if [ "$MONITORING_ENABLED" = "true" ]; then
 
     if [ -f "$WEB_DIR/status.json" ]; then
         printf "\n=== Current Metrics ===\n"
-        cat "$WEB_DIR/status.json" | jq -r '.overall_status + " - CPU: " + (.cpu_usage | tostring) + "%, Memory: " + (.memory_usage | tostring) + "%, Disk: " + (.disk_usage | tostring) + "%"'
+        jq -r '.overall_status + " - CPU: " + (.cpu_usage | tostring) + "%, Memory: " + (.memory_usage | tostring) + "%, Disk: " + (.disk_usage | tostring) + "%"' "$WEB_DIR/status.json"
     fi
 fi
