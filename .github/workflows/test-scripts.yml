@@ -109,9 +109,72 @@ jobs:
       run: |
         echo "☁️ Validating CloudFormation templates..."
         if [ -f "cloudformation/template-docker-enhanced.yaml" ]; then
-          # Basic YAML syntax check
-          python3 -c "import yaml; yaml.safe_load(open('cloudformation/template-docker-enhanced.yaml'))"
-          echo "✅ CloudFormation template is valid YAML"
+          # Check basic YAML structure without loading CloudFormation intrinsic functions
+          python3 -c "
+import yaml
+import sys
+
+class CloudFormationLoader(yaml.SafeLoader):
+    pass
+
+# Add constructors for CloudFormation intrinsic functions
+def construct_ref(loader, node):
+    return {'Ref': loader.construct_scalar(node)}
+
+def construct_getatt(loader, node):
+    return {'Fn::GetAtt': loader.construct_sequence(node)}
+
+def construct_equals(loader, node):
+    return {'Fn::Equals': loader.construct_sequence(node)}
+
+def construct_not(loader, node):
+    return {'Fn::Not': loader.construct_sequence(node)}
+
+def construct_if(loader, node):
+    return {'Fn::If': loader.construct_sequence(node)}
+
+def construct_and(loader, node):
+    return {'Fn::And': loader.construct_sequence(node)}
+
+def construct_or(loader, node):
+    return {'Fn::Or': loader.construct_sequence(node)}
+
+def construct_sub(loader, node):
+    return {'Fn::Sub': loader.construct_scalar(node)}
+
+def construct_join(loader, node):
+    return {'Fn::Join': loader.construct_sequence(node)}
+
+def construct_base64(loader, node):
+    return {'Fn::Base64': loader.construct_scalar(node)}
+
+def construct_select(loader, node):
+    return {'Fn::Select': loader.construct_sequence(node)}
+
+def construct_split(loader, node):
+    return {'Fn::Split': loader.construct_sequence(node)}
+
+CloudFormationLoader.add_constructor('!Ref', construct_ref)
+CloudFormationLoader.add_constructor('!GetAtt', construct_getatt)
+CloudFormationLoader.add_constructor('!Equals', construct_equals)
+CloudFormationLoader.add_constructor('!Not', construct_not)
+CloudFormationLoader.add_constructor('!If', construct_if)
+CloudFormationLoader.add_constructor('!And', construct_and)
+CloudFormationLoader.add_constructor('!Or', construct_or)
+CloudFormationLoader.add_constructor('!Sub', construct_sub)
+CloudFormationLoader.add_constructor('!Join', construct_join)
+CloudFormationLoader.add_constructor('!Base64', construct_base64)
+CloudFormationLoader.add_constructor('!Select', construct_select)
+CloudFormationLoader.add_constructor('!Split', construct_split)
+
+try:
+    with open('cloudformation/template-docker-enhanced.yaml', 'r') as f:
+        yaml.load(f, Loader=CloudFormationLoader)
+    print('✅ CloudFormation template syntax is valid')
+except Exception as e:
+    print(f'❌ CloudFormation template validation failed: {e}')
+    sys.exit(1)
+"
         fi
 
     - name: Check file permissions
