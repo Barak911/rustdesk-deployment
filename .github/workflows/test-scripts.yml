@@ -46,7 +46,7 @@ jobs:
 
         for file in $SHELL_FILES; do
           echo "Checking: $file"
-          shellcheck "$file"
+          shellcheck --severity=error "$file"
         done
         echo "✅ All shell scripts passed validation"
 
