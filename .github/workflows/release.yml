@@ -27,7 +27,7 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ vars.AWS_REGION }}
+        aws-region: il-central-1
 
     - name: Set release version
       run: |
@@ -43,9 +43,9 @@ jobs:
 
         # Run all validation checks
         find components/ -name "*.sh" -exec shellcheck {} \;
-        python3 -m py_compile components/scripts/send_email.py
-        python3 -m py_compile components/web/dashboard-server.py
-        python3 -m json.tool components/configs/cloudwatch-agent-config.json > /dev/null
+        python3 -m py_compile components/send_email.py
+        python3 -m py_compile components/dashboard-server.py
+        python3 -m json.tool components/cloudwatch-agent-config.json > /dev/null
 
         echo "✅ All components validated for release"
 
@@ -125,13 +125,13 @@ jobs:
         echo "🚀 Deploying ${RELEASE_VERSION} to production..."
 
         # Deploy to production S3
-        aws s3 sync components/ s3://${{ vars.PROD_S3_BUCKET }}/Components/
-        aws s3 cp bootstrap/rustdesk-bootstrap-modular.sh s3://${{ vars.PROD_S3_BUCKET }}/Components/
-        aws s3 cp cloudformation/template-docker-enhanced.yaml s3://${{ vars.PROD_S3_BUCKET }}/CloudFormation/
-        aws s3 cp cloudformation/parameters-prod.json s3://${{ vars.PROD_S3_BUCKET }}/CloudFormation/
+        aws s3 sync components/ s3://rustdesk-s3-bak/Components/
+        aws s3 cp bootstrap/rustdesk-bootstrap-modular.sh s3://rustdesk-s3-bak/Components/
+        aws s3 cp cloudformation/template-docker-enhanced.yaml s3://rustdesk-s3-bak/CloudFormation/
+        aws s3 cp cloudformation/parameters-prod.json s3://rustdesk-s3-bak/CloudFormation/
 
         # Create versioned backup
-        aws s3 sync components/ s3://${{ vars.PROD_S3_BUCKET }}/Releases/${RELEASE_VERSION}/Components/
+        aws s3 sync components/ s3://rustdesk-s3-bak/Releases/${RELEASE_VERSION}/Components/
 
         echo "✅ Production deployment complete"
 
@@ -169,6 +169,6 @@ jobs:
     - name: Post-release notification
       run: |
         echo "🎉 Release ${{ env.RELEASE_VERSION }} completed successfully!"
-        echo "📦 Production S3: s3://${{ vars.PROD_S3_BUCKET }}/Components/"
+        echo "📦 Production S3: s3://rustdesk-s3-bak/Components/"
         echo "🏷️ GitHub Release: https://github.com/${{ github.repository }}/releases/tag/${{ env.RELEASE_VERSION }}"
         echo "📋 Changelog: See release notes for details"

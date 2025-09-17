@@ -46,11 +46,11 @@ jobs:
         find components/ -name "*.sh" -exec shellcheck {} \;
 
         # Python syntax validation
-        python3 -m py_compile components/scripts/send_email.py
-        python3 -m py_compile components/web/dashboard-server.py
+        python3 -m py_compile components/send_email.py
+        python3 -m py_compile components/dashboard-server.py
 
         # JSON validation
-        python3 -m json.tool components/configs/cloudwatch-agent-config.json > /dev/null
+        python3 -m json.tool components/cloudwatch-agent-config.json > /dev/null
 
     - name: Deploy components to S3
       run: |
