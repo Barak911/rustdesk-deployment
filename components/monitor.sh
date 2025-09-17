@@ -2,6 +2,7 @@
 set -eo pipefail
 
 # Load environment using standardized loader
+# shellcheck disable=SC1091
 source /opt/rustdesk/env-loader.sh
 
 # Check if backup is in progress
@@ -736,7 +737,7 @@ fi
 
 # Check Memory with auto-remediation
 if (( $(echo "$memory_usage > $MEMORY_THRESHOLD" | bc -l) )); then
-  local severity="WARNING"
+  severity="WARNING"
   if (( $(echo "$memory_usage > $(echo "$MEMORY_THRESHOLD * 1.2" | bc)" | bc -l) )); then
     severity="CRITICAL"
   fi
@@ -774,7 +775,7 @@ fi
 
 # Check Disk with auto-remediation
 if [ "$disk_usage" -gt "$DISK_THRESHOLD" ]; then
-  local severity="WARNING"
+  severity="WARNING"
   if [ "$disk_usage" -gt 95 ]; then
     severity="CRITICAL"
   fi
@@ -811,7 +812,7 @@ fi
 
 # Check connectivity with auto-remediation
 if (( $(echo "$connectivity_score < 100" | bc -l) )); then
-  local severity="WARNING"
+  severity="WARNING"
   if (( $(echo "$connectivity_score < 67" | bc -l) )); then
     severity="CRITICAL"
   fi
