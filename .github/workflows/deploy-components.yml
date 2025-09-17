@@ -1,0 +1,99 @@
+name: Deploy RustDesk Components
+
+on:
+  push:
+    branches: [main, staging]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'staging' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION }}
+
+    - name: Set environment variables
+      run: |
+        if [[ "${{ github.ref_name }}" == "main" ]]; then
+          echo "BUCKET_NAME=${{ vars.PROD_S3_BUCKET }}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+        else
+          echo "BUCKET_NAME=${{ vars.STAGING_S3_BUCKET }}" >> $GITHUB_ENV
+          echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+        fi
+
+    - name: Validate scripts
+      run: |
+        # Shellcheck validation
+        find components/ -name "*.sh" -exec shellcheck {} \;
+
+        # Python syntax validation
+        python3 -m py_compile components/scripts/send_email.py
+        python3 -m py_compile components/web/dashboard-server.py
+
+        # JSON validation
+        python3 -m json.tool components/configs/cloudwatch-agent-config.json > /dev/null
+
+    - name: Deploy components to S3
+      run: |
+        echo "🚀 Deploying to ${ENVIRONMENT} environment..."
+        echo "📦 S3 Bucket: ${BUCKET_NAME}"
+
+        # Sync all components
+        aws s3 sync components/ s3://${BUCKET_NAME}/Components/ --delete --exclude "*.md"
+
+        # Upload bootstrap script
+        aws s3 cp bootstrap/rustdesk-bootstrap-modular.sh s3://${BUCKET_NAME}/Components/
+
+        # Upload CloudFormation template
+        aws s3 cp cloudformation/template-docker-enhanced.yaml s3://${BUCKET_NAME}/CloudFormation/
+        aws s3 cp cloudformation/parameters-${ENVIRONMENT}.json s3://${BUCKET_NAME}/CloudFormation/
+
+    - name: Verify deployment
+      run: |
+        echo "✅ Verifying deployment..."
+        aws s3 ls s3://${BUCKET_NAME}/Components/ --recursive
+
+        # Count files
+        COMPONENT_COUNT=$(aws s3 ls s3://${BUCKET_NAME}/Components/ --recursive | wc -l)
+        echo "📊 Deployed ${COMPONENT_COUNT} components"
+
+        if [ ${COMPONENT_COUNT} -lt 10 ]; then
+          echo "❌ Expected at least 10 components, found ${COMPONENT_COUNT}"
+          exit 1
+        fi
+
+    - name: Notify deployment
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment to ${ENVIRONMENT} successful!"
+        else
+          echo "❌ Deployment to ${ENVIRONMENT} failed!"
+        fi
+
+    - name: Create deployment tag
+      if: github.ref_name == 'main' && success()
+      run: |
+        TAG_NAME="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
+        git tag ${TAG_NAME}
+        git push origin ${TAG_NAME}
+        echo "🏷️ Created tag: ${TAG_NAME}"

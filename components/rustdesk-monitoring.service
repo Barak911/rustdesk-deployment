@@ -1,0 +1,12 @@
+[Unit]
+Description=RustDesk Monitoring Service
+After=network.target
+
+[Service]
+EnvironmentFile=/opt/rustdesk/rustdesk.env
+Type=oneshot
+User=root
+ExecStart=/opt/rustdesk/monitoring/monitor.sh
+
+[Install]
+WantedBy=multi-user.target

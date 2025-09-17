@@ -1,0 +1,653 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Enhanced RustDesk Server deployment with monitoring and observability
+Parameters:
+  VpcCidrBlock:
+    Description: Please set CIDR to the VPC. Ex - 10.0.0.0/16
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 10.0.0.0/16
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: Please set CIDR to the VPC. Ex - 10.0.0.0/16
+  SubnetCidrBlock:
+    Description: Please set CIDR to the subnet. Ex - 10.0.0.0/24
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 10.0.0.0/24
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: Please set CIDR to the subnet. Ex - 10.0.0.0/24
+  KeyName:
+    Description: Name of an existing EC2 key pair for SSH access to the EC2 instance
+    Type: AWS::EC2::KeyPair::KeyName
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: Please set CIDR to allow specific IP address access
+  DeploymentName:
+    Description: Name of the deployment
+    Type: String
+    MinLength: 2
+    MaxLength: 32
+    Default: prod
+    AllowedPattern: ^[a-zA-Z0-9-]*$
+    ConstraintDescription: Please set alphanumeric name
+  InstanceType:
+    Description: Rustdesk EC2 instance type
+    Type: String
+    Default: t3a.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t3.micro
+      - t3.small
+      - t3a.micro
+      - t3a.small
+      - m4.large
+      - m5.large
+      - m5a.large
+      - m6a.large
+      - m7a.medium
+      - c5.large
+      - c5a.large
+      - c6a.large
+    ConstraintDescription: must be a valid EC2 instance type
+  S3BucketName:
+    Description: Name of the S3 bucket containing environment file and bootstrap scripts
+    Type: String
+    Default: rustdesk-test-s3-bak
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: ^[a-z0-9][a-z0-9-]*[a-z0-9]$
+    ConstraintDescription: Bucket name must be between 3 and 63 characters, contain only lowercase letters, numbers, and hyphens, and start and end with a letter or number
+  EipAllocationId:
+    Description: AllocationId of an existing Elastic IP to associate with the instance
+    Type: String
+  RustDeskDomain:
+    Description: Domain name for RustDesk server (required for SSL)
+    Type: String
+    Default: "danyel-remote.com"
+  SSLEnabled:
+    Description: Enable SSL/HTTPS with Let's Encrypt
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+  SSLEmail:
+    Description: Email address for Let's Encrypt certificate registration
+    Type: String
+    Default: "barak@danyel.co.il"
+  RustDeskEmailFrom:
+    Description: Email address to send alerts from
+    Type: String
+    Default: "alerts@example.com"
+  RustDeskEmailTo:
+    Description: Email address to send alerts to
+    Type: String
+    Default: "admin@example.com"
+  EmailPasswordSecretName:
+    Description: Name of AWS Secrets Manager secret containing email password
+    Type: String
+    Default: "rustdesk/email-password"
+  SSHAllowedIP:
+    Description: IP address allowed for SSH access
+    Type: String
+    Default: "0.0.0.0/0"
+  SMTPServer:
+    Description: SMTP server for email alerts
+    Type: String
+    Default: "smtp.gmail.com"
+  SMTPPort:
+    Description: SMTP port for email alerts
+    Type: String
+    Default: "587"
+  SSLCertificateOrganization:
+    Description: Organization name for SSL certificate
+    Type: String
+    Default: "RustDesk"
+  # Monitoring Parameters
+  MonitoringEnabled:
+    Description: Enable monitoring and alerting
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+  CreateEmailSecret:
+    Description: Create new Secrets Manager secret for email password (set to false if secret already exists)
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  MonitoringPort:
+    Description: Port for monitoring web interface
+    Type: String
+  CPUThreshold:
+    Description: CPU usage threshold for alerts (percentage)
+    Type: String
+  MemoryThreshold:
+    Description: Memory usage threshold for alerts (percentage)
+    Type: String
+  DiskThreshold:
+    Description: Disk usage threshold for alerts (percentage)
+    Type: String
+  AlertCooldownMinutes:
+    Description: Minutes between alerts to prevent spam
+    Type: String
+  RustDeskPort:
+    Description: Main RustDesk server port
+    Type: String
+    Default: "21116"
+  RustDeskRelayPort:
+    Description: RustDesk relay port
+    Type: String
+    Default: "21117"
+  RustDeskWebPort:
+    Description: RustDesk web port
+    Type: String
+    Default: "21118"
+Mappings:
+  RegionMap:
+    eu-west-1:
+      AMI: ami-021d9f8e43481e7da
+    eu-central-1:
+      AMI: ami-0a87a69d69fa289be
+    il-central-1:
+      AMI: ami-0a4f501bd7555611c
+
+Conditions:
+  MonitoringEnabled: !Equals [!Ref MonitoringEnabled, "true"]
+  CreateEmailSecret: !Equals [!Ref CreateEmailSecret, "true"]
+
+Resources:
+  # Secrets Manager Secret for Email Password (conditional)
+  EmailPasswordSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: CreateEmailSecret
+    Properties:
+      Name: !Ref EmailPasswordSecretName
+      Description: Email password for RustDesk SMTP authentication
+      SecretString: !Sub |
+        {
+          "password": "CHANGE_ME_AFTER_DEPLOYMENT"
+        }
+      Tags:
+        - Key: Name
+          Value: !Sub rustdesk-email-secret-${DeploymentName}
+        - Key: Application
+          Value: RustDesk
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Metadata:
+      Comment: VPC for deployment
+    Properties:
+      CidrBlock: !Ref VpcCidrBlock
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub rustdesk-vpc-cft-${DeploymentName}
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      Comment: Subnet for deployment
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidrBlock
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: AWS::Region
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub rustdesk-subnet-cft-${DeploymentName}
+
+  InternetGateway:
+    Metadata:
+      Comment: Internet Gateway to access internet
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub rustdesk-internet-gateway-cft-${DeploymentName}
+
+  VpcInternetGatewayAttachment:
+    Metadata:
+      Comment: Internet Gateway attachment to VPC
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Metadata:
+      Comment: Route table for holding routes
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub rustdesk-route-table-cft-${DeploymentName}
+
+  DefaultRoute:
+    Metadata:
+      Comment: Default route for route traffic to internet gateway
+    Type: AWS::EC2::Route
+    DependsOn: VpcInternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Metadata:
+      Comment: Subnet and route table association
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref Subnet
+
+  SecurityGroup:
+    Metadata:
+      Comment: Rustdesk security group
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub rustdesk-${DeploymentName}
+      GroupDescription: RustDesk Security Group
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHLocation
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 21114
+          ToPort: 21119
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 21116
+          ToPort: 21116
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 21117
+          ToPort: 21117
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: !Ref MonitoringPort
+          ToPort: !Ref MonitoringPort
+          CidrIp: !Ref SSHLocation
+      Tags:
+        - Key: Name
+          Value: !Sub rustdesk-${DeploymentName}
+
+  # VPC Flow Logs for network monitoring
+  VpcFlowLogsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: vpc-flow-logs.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FlowLogsDeliveryRolePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+
+  VpcFlowLogsGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/vpc/flowlogs/${DeploymentName}'
+      RetentionInDays: 7
+
+  VpcFlowLogs:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      ResourceType: VPC
+      ResourceId: !Ref Vpc
+      TrafficType: ALL
+      LogDestinationType: cloud-watch-logs
+      LogGroupName: !Ref VpcFlowLogsGroup
+      DeliverLogsPermissionArn: !GetAtt VpcFlowLogsRole.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub rustdesk-flowlogs-${DeploymentName}
+
+  RolePolicy:
+    Metadata:
+      Comment: IAM Policy for Rustdesk role
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub rustdesk-${DeploymentName}
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: S3ObjectsAccess
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub arn:aws:s3:::${S3BucketName}/*
+          - Sid: S3BucketsAccess
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:PutBucketVersioning
+            Resource:
+              - !Sub arn:aws:s3:::${S3BucketName}
+          - Sid: CloudWatchAccess
+            Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+              - cloudwatch:GetMetricStatistics
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+            Resource: "*"
+          - Sid: SecretsManagerAccess
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DescribeSecret
+            Resource:
+              - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${EmailPasswordSecretName}*'
+      Roles:
+        - !Ref Role
+
+  Role:
+    Metadata:
+      Comment: IAM role of Rustdesk
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub rustdesk-${DeploymentName}
+      Description: IAM role of RustDesk
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: sts:AssumeRole
+            Principal:
+              Service: ec2.amazonaws.com
+            Effect: Allow
+            Sid: ''
+
+  InstanceProfile:
+    Metadata:
+      Comment: Instance profile of Rustdesk
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub rustdesk-${DeploymentName}
+      Path: /
+      Roles:
+        - !Ref Role
+
+  Instance:
+    Metadata:
+      Comment: initialize Rustdesk instance
+    Type: AWS::EC2::Instance
+    DependsOn: InstanceProfile
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", "AMI"]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SubnetId: !Ref Subnet
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      Monitoring: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          
+          # Make rustdesk directory
+          mkdir -p /opt/rustdesk
+          mkdir -p /opt/rustdesk/scripts
+          mkdir -p /opt/rustdesk/backup
+          mkdir -p /opt/rustdesk/data
+          mkdir -p /opt/rustdesk/monitoring
+          mkdir -p /opt/rustdesk/logs
+
+          # Configure logging
+          exec > >(tee -a /opt/rustdesk/logs/cloud-init-output.log) 2>&1
+          
+          echo "=== RustDesk Server Initialization with S3 Environment ==="
+          echo "Timestamp: $(date)"
+          echo "S3 Bucket: ${S3BucketName}"
+          echo "AWS Region: ${AWS::Region}"
+          echo "Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo 'unknown')"
+          
+          # Update system and install required packages
+          apt update
+          apt install -y awscli curl wget jq
+          
+          # Retrieve email password from Secrets Manager
+          echo "Retrieving email password from Secrets Manager..."
+          EMAIL_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "${EmailPasswordSecretName}" --region "${AWS::Region}" --query SecretString --output text | jq -r .password)
+          
+          # Create environment file from CloudFormation parameters
+          cd /opt/rustdesk
+          echo "Creating environment file from CloudFormation parameters..."
+          
+          cat > /opt/rustdesk/rustdesk.env << 'ENV_EOF'
+          S3_BUCKET=${S3BucketName}
+          AWS_REGION=${AWS::Region}
+          RUSTDESK_PORT=${RustDeskPort}
+          RUSTDESK_RELAY_PORT=${RustDeskRelayPort}
+          RUSTDESK_WEB_PORT=${RustDeskWebPort}
+          MONITORING_PORT=${MonitoringPort}
+          CPU_THRESHOLD=${CPUThreshold}
+          MEMORY_THRESHOLD=${MemoryThreshold}
+          DISK_THRESHOLD=${DiskThreshold}
+          ALERT_COOLDOWN_MINUTES=${AlertCooldownMinutes}
+          SMTP_SERVER=${SMTPServer}
+          SMTP_PORT=${SMTPPort}
+          EMAIL_USER=${RustDeskEmailFrom}
+          EMAIL_PASSWORD_SECRET_NAME=${EmailPasswordSecretName}
+          ALERT_EMAIL=${RustDeskEmailTo}
+          MONITORING_ENABLED=${MonitoringEnabled}
+          SSL_ENABLED=${SSLEnabled}
+          SSL_DOMAIN=${RustDeskDomain}
+          SSL_EMAIL=${SSLEmail}
+          BASE_DIR="/opt/rustdesk"
+          BACKUP_DIR="/opt/rustdesk/backup"
+          DATA_DIR="/opt/rustdesk/data"
+          MONITORING_DIR="/opt/rustdesk/monitoring"
+          WEB_DIR="/opt/rustdesk/web"
+          SCRIPTS_DIR="/opt/rustdesk/scripts"
+          LOG_DIR="/opt/rustdesk/logs"
+          ENV_EOF
+          
+          echo "Environment file created successfully"
+
+          # Make environment file readable only by root
+          chmod 600 /opt/rustdesk/rustdesk.env
+
+          # Create symlink to environment file
+          ln -s /opt/rustdesk/rustdesk.env /tmp/rustdesk.env
+
+          # Make a env-loader.sh file
+          cat > /opt/rustdesk/env-loader.sh << 'ENV_LOADER_EOF'
+          # /opt/rustdesk/env-loader.sh
+          #!/usr/bin/env bash
+          # Always exit if the file is missing or unreadable
+          set -euo pipefail
+
+          ENV_FILE="/opt/rustdesk/rustdesk.env"
+          [ -r "$ENV_FILE" ] || { echo "FATAL: $ENV_FILE missing"; exit 1; }
+
+          # export (-a) so children inherit
+          set -a
+          . "$ENV_FILE"
+          set +a
+          ENV_LOADER_EOF
+          
+          # Make env-loader.sh executable
+          chmod 500 /opt/rustdesk/env-loader.sh
+
+          # run env-loader.sh
+          source /opt/rustdesk/env-loader.sh
+
+          # Create symlink to env-loader.sh
+          ln -s /opt/rustdesk/env-loader.sh /tmp/env-loader.sh
+
+
+          # Verify environment variables are loaded
+          echo "Environment variables loaded:"
+          echo "  S3_BUCKET: $S3_BUCKET"
+          echo "  RUSTDESK_PORT: $RUSTDESK_PORT"
+          echo "  MONITORING_PORT: $MONITORING_PORT"
+          echo "  EMAIL_USER: $EMAIL_USER"
+          
+
+          # directory /opt/rustdesk
+          cd /opt/rustdesk
+
+          # Download bootstrap and SSL setup scripts
+          echo "Downloading bootstrap script..."
+          aws s3 cp s3://${S3BucketName}/Scripts/rustdesk-bootstrap-enhanced.sh ./scripts/rustdesk-bootstrap-enhanced.sh --region ${AWS::Region}
+          aws s3 cp s3://${S3BucketName}/Scripts/setup-ssl.sh ./scripts/setup-ssl.sh --region ${AWS::Region} || echo "SSL setup script not found in S3, skipping..."
+          chmod +x scripts/rustdesk-bootstrap-enhanced.sh
+          chmod +x scripts/setup-ssl.sh 2>/dev/null || true
+          
+          # Run bootstrap script
+          echo "Starting RustDesk bootstrap..."
+          ./scripts/rustdesk-bootstrap-enhanced.sh
+
+          # Run bootstrap script second time
+          echo "Starting RustDesk bootstrap second time..."
+          ./scripts/rustdesk-bootstrap-enhanced.sh
+          
+          # Set up SSL if enabled
+          if [ "${SSLEnabled}" = "true" ] && [ -n "${RustDeskDomain}" ] && [ -f "./scripts/setup-ssl.sh" ]; then
+            echo "Setting up SSL for domain: ${RustDeskDomain}"
+            # Update SSL script with CloudFormation parameters
+            sed -i "s/DOMAIN=\"danyel-remote.com\"/DOMAIN=\"${RustDeskDomain}\"/" ./scripts/setup-ssl.sh
+            sed -i "s/EMAIL=\"barak@danyel.co.il\"/EMAIL=\"${SSLEmail}\"/" ./scripts/setup-ssl.sh
+            
+            # Run SSL setup
+            ./scripts/setup-ssl.sh
+            echo "=== SSL setup completed at $(date) ==="
+          else
+            echo "SSL setup skipped (SSL_ENABLED=${SSLEnabled}, domain=${RustDeskDomain})"
+          fi
+          
+          echo "=== Bootstrap completed at $(date) ==="
+      Tags:
+        - Key: Name
+          Value: !Sub rustdesk-${DeploymentName}
+
+  EipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !Ref EipAllocationId
+      InstanceId: !Ref Instance
+
+  # CloudWatch Alarms for monitoring
+  CPUUtilizationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: MonitoringEnabled
+    Properties:
+      AlarmName: !Sub ${DeploymentName}-CPU-Utilization
+      AlarmDescription: CPU utilization is too high
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref CPUThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref Instance
+      AlarmActions:
+        - !Ref SNSTopic
+
+  MemoryUtilizationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: MonitoringEnabled
+    Properties:
+      AlarmName: !Sub ${DeploymentName}-Memory-Utilization
+      AlarmDescription: Memory utilization is too high
+      MetricName: MemoryUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref MemoryThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref Instance
+      AlarmActions:
+        - !Ref SNSTopic
+
+  # SNS Topic for email notifications
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Condition: MonitoringEnabled
+    Properties:
+      TopicName: !Sub ${DeploymentName}-alerts
+      DisplayName: !Sub ${DeploymentName} RustDesk Alerts
+
+  SNSSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: MonitoringEnabled
+    Properties:
+      TopicArn: !Ref SNSTopic
+      Protocol: email
+      Endpoint: !Ref RustDeskEmailTo
+
+Outputs:
+  PublicIp:
+    Description: Public IP of the Rustdesk instance
+    Value: !GetAtt Instance.PublicIp
+    Export:
+      Name: !Sub Rustdesk-PublicIp-${DeploymentName}
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref Instance
+    Export:
+      Name: !Sub Rustdesk-InstanceId-${DeploymentName}
+  RustDeskS3BucketName:
+    Description: S3 bucket name for RustDesk data
+    Value: !Ref S3BucketName
+  MonitoringUrl:
+    Description: URL for monitoring dashboard
+    Value: !Sub http://${Instance.PublicIp}:${MonitoringPort}
+    Condition: MonitoringEnabled
+  SNSTopicArn:
+    Description: SNS Topic ARN for alerts
+    Value: !Ref SNSTopic
+    Condition: MonitoringEnabled 

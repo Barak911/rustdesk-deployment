@@ -1,0 +1,11 @@
+[Unit]
+Description=Run RustDesk monitoring every 5 minutes
+Requires=rustdesk-monitoring.service
+
+[Timer]
+Unit=rustdesk-monitoring.service
+OnCalendar=*:0/5
+Persistent=true
+
+[Install]
+WantedBy=timers.target

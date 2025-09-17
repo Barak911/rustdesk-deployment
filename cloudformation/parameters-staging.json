@@ -1,0 +1,110 @@
+[
+  {
+    "ParameterKey": "StackName",
+    "ParameterValue": "rustdesk-staging"
+  },
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "staging"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t3a.micro"
+  },
+  {
+    "ParameterKey": "KeyName",
+    "ParameterValue": "Danyel-RustDesk-SSH"
+  },
+  {
+    "ParameterKey": "SshLocation",
+    "ParameterValue": "85.250.211.189/32"
+  },
+  {
+    "ParameterKey": "EipAllocationId",
+    "ParameterValue": "eipalloc-00ef36094fe6fcae2"
+  },
+  {
+    "ParameterKey": "S3Bucket",
+    "ParameterValue": "rustdesk-staging"
+  },
+  {
+    "ParameterKey": "EmailPasswordSecretName",
+    "ParameterValue": "rustdesk/staging/email-password"
+  },
+  {
+    "ParameterKey": "EmailUser",
+    "ParameterValue": "barak@danyel.co.il"
+  },
+  {
+    "ParameterKey": "AlertEmail",
+    "ParameterValue": "barak@danyel.co.il"
+  },
+  {
+    "ParameterKey": "SmtpServer",
+    "ParameterValue": "smtp.office365.com"
+  },
+  {
+    "ParameterKey": "SmtpPort",
+    "ParameterValue": "587"
+  },
+  {
+    "ParameterKey": "MonitoringEnabled",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "MonitoringPort",
+    "ParameterValue": "8080"
+  },
+  {
+    "ParameterKey": "RustDeskPort",
+    "ParameterValue": "21116"
+  },
+  {
+    "ParameterKey": "RustDeskRelayPort",
+    "ParameterValue": "21117"
+  },
+  {
+    "ParameterKey": "RustDeskWebPort",
+    "ParameterValue": "21114"
+  },
+  {
+    "ParameterKey": "SSLEnabled",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "SSLDomain",
+    "ParameterValue": "danyel-remote-staging.com"
+  },
+  {
+    "ParameterKey": "SSLEmail",
+    "ParameterValue": "barak@danyel.co.il"
+  },
+  {
+    "ParameterKey": "VpcCidrBlock",
+    "ParameterValue": "10.1.0.0/16"
+  },
+  {
+    "ParameterKey": "SubnetCidrBlock",
+    "ParameterValue": "10.1.1.0/24"
+  },
+  {
+    "ParameterKey": "AlertCooldownMinutes",
+    "ParameterValue": "5"
+  },
+  {
+    "ParameterKey": "CpuThreshold",
+    "ParameterValue": "80"
+  },
+  {
+    "ParameterKey": "MemoryThreshold",
+    "ParameterValue": "85"
+  },
+  {
+    "ParameterKey": "DiskThreshold",
+    "ParameterValue": "90"
+  },
+  {
+    "ParameterKey": "AWSRegion",
+    "ParameterValue": "il-central-1"
+  }
+]

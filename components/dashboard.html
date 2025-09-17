@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RustDesk Server Status - Enhanced</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+        .status-ok { background-color: #27ae60; }
+        .status-warning { background-color: #f39c12; }
+        .status-critical { background-color: #e74c3c; }
+        .status-backup { background-color: #3498db; animation: backup-pulse 1s infinite; }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        @keyframes backup-pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .content {
+            padding: 30px;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .metric:last-child {
+            border-bottom: none;
+        }
+        .metric-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .metric-value {
+            font-weight: 500;
+        }
+        .progress-bar {
+            width: 200px;
+            height: 8px;
+            background-color: #ecf0f1;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .progress-ok { background-color: #27ae60; }
+        .progress-warning { background-color: #f39c12; }
+        .progress-critical { background-color: #e74c3c; }
+        .progress-backup { background-color: #3498db; }
+        .timestamp {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .refresh-btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 20px;
+            margin-right: 10px;
+        }
+        .refresh-btn:hover {
+            background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+        }
+        .backup-status {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+        .backup-status.backup-active {
+            background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+            animation: backup-notice 2s ease-in-out infinite;
+        }
+        @keyframes backup-notice {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+        .service-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .service-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #ddd;
+        }
+        .service-card.ok { border-left-color: #27ae60; }
+        .service-card.warning { border-left-color: #f39c12; }
+        .service-card.critical { border-left-color: #e74c3c; }
+        .service-card.backup { border-left-color: #3498db; }
+        .service-card.license-conflict { border-left-color: #e74c3c; background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%); }
+        .service-name {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        .service-status {
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+        .alert-history {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .alert-history h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .alert-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            background: white;
+            border-left: 3px solid #ddd;
+        }
+        .alert-item.critical { border-left-color: #e74c3c; }
+        .alert-item.warning { border-left-color: #f39c12; }
+        .alert-item.info { border-left-color: #3498db; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span id="status-indicator" class="status-indicator"></span>RustDesk Server Status</h1>
+        </div>
+        <div class="content">
+            <button class="refresh-btn" id="refresh-btn" onclick="loadStatus()">Refresh Status</button>
+            <button class="refresh-btn" onclick="testServer()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">Test Server</button>
+            <button class="refresh-btn" onclick="viewLogs()" style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);">View Logs</button>
+
+            <div id="backup-status" class="backup-status" style="display: none;">
+                <strong>🔄 Backup in Progress</strong><br>
+                <small>Monitoring is in backup mode - service alerts are temporarily suspended</small>
+            </div>
+
+            <div class="service-grid" id="service-grid"></div>
+
+            <div id="charts-section" style="margin: 20px 0;">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">📈 Historical Trends</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                        <div id="cpu-chart"></div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                        <div id="memory-chart"></div>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                        <div id="connections-chart"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="metrics"></div>
+
+            <div class="alert-history">
+                <h3>Recent Alerts</h3>
+                <div id="alert-history"></div>
+            </div>
+
+            <div id="timestamp" class="timestamp"></div>
+        </div>
+    </div>
+
+    <script>
+        let alertHistory = [];
+
+        function loadStatus() {
+            console.log('Refreshing status...');
+            const refreshBtn = document.getElementById('refresh-btn');
+            const originalText = refreshBtn.textContent;
+
+            // Show loading state
+            refreshBtn.textContent = 'Refreshing...';
+            refreshBtn.disabled = true;
+
+            // First trigger monitoring script to update status.json, then fetch it
+            fetch('/refresh')
+                .then(() => {
+                    // Wait a moment for the monitoring script to complete
+                    return new Promise(resolve => setTimeout(resolve, 2000));
+                })
+                .then(() => {
+                    return fetch('/status.json');
+                })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Status data received:', data);
+                    updateUI(data);
+                    // Load historical data for charts
+                    loadHistoricalData();
+                })
+                .catch(error => {
+                    console.error('Error loading status:', error);
+                    document.getElementById('metrics').innerHTML = '<p style="color: #e74c3c;">Error loading status data: ' + error.message + '</p>';
+                })
+                .finally(() => {
+                    // Reset button state
+                    refreshBtn.textContent = originalText;
+                    refreshBtn.disabled = false;
+                });
+        }
+
+        function updateUI(data) {
+            const statusIndicator = document.getElementById('status-indicator');
+            const metricsDiv = document.getElementById('metrics');
+            const timestampDiv = document.getElementById('timestamp');
+            const backupStatusDiv = document.getElementById('backup-status');
+            const serviceGridDiv = document.getElementById('service-grid');
+
+            // Update status indicator
+            statusIndicator.className = 'status-indicator';
+            if (data.backup_status === 'IN_PROGRESS') {
+                statusIndicator.classList.add('status-backup');
+                backupStatusDiv.style.display = 'block';
+                backupStatusDiv.classList.add('backup-active');
+            } else {
+                backupStatusDiv.style.display = 'none';
+                backupStatusDiv.classList.remove('backup-active');
+
+                if (data.overall_status === 'LICENSE_CONFLICT') {
+                    statusIndicator.classList.add('status-critical');
+                    statusIndicator.textContent = '🔑';
+                } else if (data.overall_status === 'OK') {
+                    statusIndicator.classList.add('status-ok');
+                    statusIndicator.textContent = '●';
+                } else if (data.overall_status === 'WARNING') {
+                    statusIndicator.classList.add('status-warning');
+                    statusIndicator.textContent = '●';
+                } else {
+                    statusIndicator.classList.add('status-critical');
+                    statusIndicator.textContent = '●';
+                }
+            }
+
+            // Update service grid
+            serviceGridDiv.innerHTML = `
+                <div class="service-card ${getServiceCardClass(data.rustdesk_status)}">
+                    <div class="service-name">RustDesk Service</div>
+                    <div class="service-status">${data.rustdesk_status}</div>
+                </div>
+                <div class="service-card ${getServiceCardClass(data.service_health)}">
+                    <div class="service-name">Service Health</div>
+                    <div class="service-status">${data.service_health || 'UNKNOWN'}</div>
+                </div>
+                <div class="service-card ${getServiceCardClass(data.license_status)}">
+                    <div class="service-name">License Status</div>
+                    <div class="service-status">${data.license_status || 'UNKNOWN'}</div>
+                </div>
+                <div class="service-card ${getServiceCardClass(data.backup_status)}">
+                    <div class="service-name">Backup Status</div>
+                    <div class="service-status">${data.backup_status || 'IDLE'}</div>
+                </div>
+            `;
+
+            // Update metrics
+            metricsDiv.innerHTML = `
+                <div class="metric">
+                    <span class="metric-name">Overall Status</span>
+                    <span class="metric-value">${data.overall_status}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">CPU Usage</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="metric-value">${data.cpu_usage.toFixed(1)}%</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${getProgressClass(data.cpu_usage, data.cpu_threshold)}"
+                                 style="width: ${Math.min(data.cpu_usage, 100)}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">Memory Usage</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="metric-value">${data.memory_usage.toFixed(1)}%</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${getProgressClass(data.memory_usage, data.memory_threshold)}"
+                                 style="width: ${Math.min(data.memory_usage, 100)}%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric">
+                    <span class="metric-name">Disk Usage</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="metric-value">${data.disk_usage}%</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${getProgressClass(data.disk_usage, data.disk_threshold)}"
+                                 style="width: ${Math.min(data.disk_usage, 100)}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Update timestamp
+            timestampDiv.textContent = `Last updated: ${new Date(data.timestamp).toLocaleString()}`;
+
+            // Add to alert history if there's a status change
+            addToAlertHistory(data);
+        }
+
+        function getServiceCardClass(status) {
+            if (status === 'BACKUP_IN_PROGRESS' || status === 'IN_PROGRESS') return 'backup';
+            if (status === 'LICENSE_CONFLICT' || status === 'CONFLICT') return 'license-conflict';
+            if (status === 'OK') return 'ok';
+            if (status === 'WARNING') return 'warning';
+            if (status === 'CRITICAL' || status === 'DOCKER_DOWN' || status === 'RUSTDESK_CRITICAL') return 'critical';
+            return '';
+        }
+
+        function getProgressClass(value, threshold) {
+            if (value >= threshold) return 'progress-critical';
+            if (value >= threshold * 0.8) return 'progress-warning';
+            return 'progress-ok';
+        }
+
+        function addToAlertHistory(data) {
+            const currentStatus = data.overall_status;
+            const currentTime = new Date().toLocaleString();
+
+            // Only add if status changed
+            if (alertHistory.length === 0 || alertHistory[alertHistory.length - 1].status !== currentStatus) {
+                let alertClass = 'info';
+                let message = `Status: ${currentStatus}`;
+
+                if (currentStatus === 'LICENSE_CONFLICT') {
+                    alertClass = 'critical';
+                    message = `🔑 License Conflict: RustDesk Pro license is already in use by another machine. Please migrate your license or resolve the conflict.`;
+                } else if (currentStatus === 'CRITICAL') {
+                    alertClass = 'critical';
+                    message = `🚨 Service Critical: ${data.rustdesk_status}`;
+                } else if (currentStatus === 'WARNING') {
+                    alertClass = 'warning';
+                    message = `⚠️ Service Warning: ${data.rustdesk_status}`;
+                } else if (data.backup_status === 'IN_PROGRESS') {
+                    alertClass = 'info';
+                    message = '🔄 Backup in Progress - Monitoring in backup mode';
+                } else if (currentStatus === 'OK') {
+                    alertClass = 'info';
+                    message = '✅ All systems operational';
+                }
+
+                alertHistory.push({
+                    time: currentTime,
+                    status: currentStatus,
+                    message: message,
+                    class: alertClass
+                });
+
+                // Keep only last 10 alerts
+                if (alertHistory.length > 10) {
+                    alertHistory.shift();
+                }
+
+                updateAlertHistory();
+            }
+        }
+
+        function updateAlertHistory() {
+            const alertHistoryDiv = document.getElementById('alert-history');
+            alertHistoryDiv.innerHTML = alertHistory.map(alert => `
+                <div class="alert-item ${alert.class}">
+                    <strong>${alert.time}</strong><br>
+                    ${alert.message}
+                </div>
+            `).join('');
+        }
+
+        function testServer() {
+            console.log('Testing server...');
+            fetch('/test')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Test response:', data);
+                    alert('Server test successful: ' + data.message);
+                })
+                .catch(error => {
+                    console.error('Server test failed:', error);
+                    alert('Server test failed: ' + error.message);
+                });
+        }
+
+        function viewLogs() {
+            // This would typically open a log viewer or fetch recent logs
+            alert('Log viewer functionality would be implemented here.\n\nYou can view logs manually using:\n\nsudo journalctl -u rustdesk-monitor.service -f\nsudo tail -f /opt/rustdesk/logs/backup.log');
+        }
+
+        // Historical data management
+        let historicalData = [];
+        let maxHistoricalPoints = 50;
+
+        function loadHistoricalData() {
+            fetch('/historical-metrics')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        historicalData = data.slice(-maxHistoricalPoints);
+                        updateCharts();
+                    }
+                })
+                .catch(error => console.log('Historical data not available:', error));
+        }
+
+        function updateCharts() {
+            if (historicalData.length < 2) return;
+
+            // Simple ASCII-style mini charts
+            updateMiniChart('cpu-chart', historicalData.map(d => d.cpu_usage), 'CPU %');
+            updateMiniChart('memory-chart', historicalData.map(d => d.memory_usage), 'Memory %');
+            updateMiniChart('connections-chart', historicalData.map(d => d.active_connections), 'Connections');
+        }
+
+        function updateMiniChart(chartId, data, label) {
+            const chartElement = document.getElementById(chartId);
+            if (!chartElement) return;
+
+            const max = Math.max(...data);
+            const min = Math.min(...data);
+            const range = max - min || 1;
+
+            // Create simple bar chart
+            let chartHtml = `<div style="font-size: 0.8em; color: #666; margin-bottom: 5px;">${label} (${min.toFixed(1)} - ${max.toFixed(1)})</div>`;
+            chartHtml += '<div style="display: flex; align-items: end; height: 30px; gap: 1px;">';
+
+            data.slice(-20).forEach(value => {
+                const height = Math.max(2, ((value - min) / range) * 25);
+                const color = value > max * 0.8 ? '#e74c3c' : value > max * 0.6 ? '#f39c12' : '#27ae60';
+                chartHtml += `<div style="background: ${color}; height: ${height}px; flex: 1; opacity: 0.7;"></div>`;
+            });
+
+            chartHtml += '</div>';
+            chartElement.innerHTML = chartHtml;
+        }
+
+        function addCurrentDataPoint(data) {
+            const currentPoint = {
+                timestamp: Date.now(),
+                cpu_usage: data.cpu_usage,
+                memory_usage: data.memory_usage,
+                disk_usage: data.disk_usage,
+                active_connections: parseInt(data.connectivity_score) || 0
+            };
+
+            historicalData.push(currentPoint);
+            if (historicalData.length > maxHistoricalPoints) {
+                historicalData.shift();
+            }
+
+            updateCharts();
+        }
+
+        // Enhanced updateUI to include charts
+        const originalUpdateUI = updateUI;
+        updateUI = function(data) {
+            originalUpdateUI(data);
+            addCurrentDataPoint(data);
+        };
+
+        // Load status on page load and refresh every 30 seconds
+        loadStatus();
+        setInterval(loadStatus, 30000);
+    </script>
+</body>
+</html>

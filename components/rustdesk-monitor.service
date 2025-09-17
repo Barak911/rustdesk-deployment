@@ -1,0 +1,15 @@
+[Unit]
+Description=RustDesk Monitoring Web Server
+After=network.target
+
+[Service]
+EnvironmentFile=/opt/rustdesk/rustdesk.env
+Type=simple
+User=root
+WorkingDirectory=/opt/rustdesk/web
+ExecStart=/usr/bin/python3 /opt/rustdesk/web/server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
