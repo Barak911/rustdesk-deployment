@@ -23,6 +23,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y shellcheck jq
+        pip install pyyaml flake8
 
     - name: Validate shell scripts
       run: |
