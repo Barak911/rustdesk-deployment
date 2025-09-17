@@ -20,18 +20,18 @@ load_rustdesk_environment() {
 
     # Load environment variables
     set -a
+    # shellcheck disable=SC1090
     source "$env_file"
     set +a
 
     # Dynamically retrieve email password from Secrets Manager
     if [ -n "$EMAIL_PASSWORD_SECRET_NAME" ] && [ "$EMAIL_PASSWORD_SECRET_NAME" != "PLACEHOLDER" ]; then
         echo "[$script_name] Retrieving email password from Secrets Manager..."
-        EMAIL_PASSWORD=$(aws secretsmanager get-secret-value \
+        if EMAIL_PASSWORD=$(aws secretsmanager get-secret-value \
             --secret-id "$EMAIL_PASSWORD_SECRET_NAME" \
             --region "$AWS_REGION" \
-            --query SecretString --output text 2>/dev/null | jq -r .password 2>/dev/null)
-
-        if [ $? -eq 0 ] && [ -n "$EMAIL_PASSWORD" ] && [ "$EMAIL_PASSWORD" != "null" ]; then
+            --query SecretString --output text 2>/dev/null | jq -r .password 2>/dev/null) && \
+           [ -n "$EMAIL_PASSWORD" ] && [ "$EMAIL_PASSWORD" != "null" ]; then
             export EMAIL_PASSWORD
             echo "[$script_name] ✓ Email password retrieved from Secrets Manager"
         else
