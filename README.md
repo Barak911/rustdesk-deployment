@@ -269,7 +269,7 @@ aws sts get-caller-identity
 
 ### **Current Version**: v1.3
 ### **Last Updated**: 2024-12-17
-### **Maintained by**: Barak Mooki
+### **Maintained by**: Barak911
 
 ---
 
