@@ -13,15 +13,15 @@
   },
   {
     "ParameterKey": "KeyName",
-    "ParameterValue": "Danyel-RustDesk-SSH"
+    "ParameterValue": "SSH-key-name"
   },
   {
     "ParameterKey": "SshLocation",
-    "ParameterValue": "85.250.211.189/32"
+    "ParameterValue": "<X.X.X.X/32>"
   },
   {
     "ParameterKey": "EipAllocationId",
-    "ParameterValue": "eipalloc-00ef36094fe6fcae2"
+    "ParameterValue": "<EipAllocationId>"
   },
   {
     "ParameterKey": "S3Bucket",
@@ -33,15 +33,15 @@
   },
   {
     "ParameterKey": "EmailUser",
-    "ParameterValue": "barak@danyel.co.il"
+    "ParameterValue": "<admin-email>"
   },
   {
     "ParameterKey": "AlertEmail",
-    "ParameterValue": "barak@danyel.co.il"
+    "ParameterValue": "<admin-email>"
   },
   {
     "ParameterKey": "SmtpServer",
-    "ParameterValue": "smtp.office365.com"
+    "ParameterValue": "smtp.com"
   },
   {
     "ParameterKey": "SmtpPort",
@@ -73,11 +73,11 @@
   },
   {
     "ParameterKey": "SSLDomain",
-    "ParameterValue": "danyel-remote-staging.com"
+    "ParameterValue": "<domain-staging.com>"
   },
   {
     "ParameterKey": "SSLEmail",
-    "ParameterValue": "barak@danyel.co.il"
+    "ParameterValue": "<admin-email>"
   },
   {
     "ParameterKey": "VpcCidrBlock",
@@ -105,6 +105,6 @@
   },
   {
     "ParameterKey": "AWSRegion",
-    "ParameterValue": "il-central-1"
+    "ParameterValue": "<aws-region>"
   }
 ]
