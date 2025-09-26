@@ -83,7 +83,7 @@ rustdesk-deployment/
 - **Purpose**: Testing and validation
 - **Branch**: `staging`
 - **S3 Bucket**: `rustdesk-staging`
-- **Domain**: `danyel-remote-staging.com`
+- **Domain**: `DOMAIN-staging.com`
 - **Instance**: `t3a.micro`
 - **SSL**: Enabled with Let's Encrypt
 
@@ -91,7 +91,7 @@ rustdesk-deployment/
 - **Purpose**: Live RustDesk service
 - **Branch**: `main`
 - **S3 Bucket**: `rustdesk-s3-bak`
-- **Domain**: `danyel-remote.com`
+- **Domain**: `DOMAIN.com`
 - **Instance**: `t3a.micro`
 - **SSL**: Enabled with Let's Encrypt
 
@@ -182,20 +182,20 @@ Ensure the AWS credentials have:
 ### **Manual Testing**
 ```bash
 # Test staging deployment
-curl https://danyel-remote-staging.com:8080
+curl https://DOMAIN-staging.com:8080
 
 # Test production deployment
-curl https://danyel-remote.com:8080
+curl https://DOMAIN.com:8080
 
 # Check RustDesk connectivity
-telnet danyel-remote.com 21116
+telnet DOMAIN.com 21116
 ```
 
 ## 📊 **Monitoring & Observability**
 
 ### **Web Dashboard**
-- **Staging**: `https://danyel-remote-staging.com/monitoring`
-- **Production**: `https://danyel-remote.com/monitoring`
+- **Staging**: `https://DOMAIN-staging.com/monitoring`
+- **Production**: `https://DOMAIN.com/monitoring`
 
 ### **CloudWatch Metrics**
 - Custom RustDesk metrics in `RustDesk/Application` namespace
