@@ -69,7 +69,7 @@ Parameters:
   RustDeskDomain:
     Description: Domain name for RustDesk server (required for SSL)
     Type: String
-    Default: "danyel-remote.com"
+    Default: "YOUR-DOMAIN.com"
   SSLEnabled:
     Description: Enable SSL/HTTPS with Let's Encrypt
     Type: String
@@ -80,7 +80,7 @@ Parameters:
   SSLEmail:
     Description: Email address for Let's Encrypt certificate registration
     Type: String
-    Default: "barak@danyel.co.il"
+    Default: "<your-admin-email>"
   RustDeskEmailFrom:
     Description: Email address to send alerts from
     Type: String
@@ -553,8 +553,8 @@ Resources:
           if [ "${SSLEnabled}" = "true" ] && [ -n "${RustDeskDomain}" ] && [ -f "./scripts/setup-ssl.sh" ]; then
             echo "Setting up SSL for domain: ${RustDeskDomain}"
             # Update SSL script with CloudFormation parameters
-            sed -i "s/DOMAIN=\"danyel-remote.com\"/DOMAIN=\"${RustDeskDomain}\"/" ./scripts/setup-ssl.sh
-            sed -i "s/EMAIL=\"barak@danyel.co.il\"/EMAIL=\"${SSLEmail}\"/" ./scripts/setup-ssl.sh
+            sed -i "s/DOMAIN=\"YOUR-DOMAIN.com\"/DOMAIN=\"${RustDeskDomain}\"/" ./scripts/setup-ssl.sh
+            sed -i "s/EMAIL=\"<your-admin-email>\"/EMAIL=\"${SSLEmail}\"/" ./scripts/setup-ssl.sh
             
             # Run SSL setup
             ./scripts/setup-ssl.sh
